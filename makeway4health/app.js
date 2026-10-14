@@ -140,6 +140,7 @@
       `Nombre: ${f.get('nombre')} ${f.get('apellido')}`, `Fecha de nacimiento: ${f.get('nacimiento')}`, `Teléfono: ${f.get('telefono')}`, `Email: ${f.get('email')}`,
       `Contacto preferido: ${f.get('canal')}`].filter((l) => l !== '');
     const url = wa(lines.join('\n'));
+    sendLead(f, goals);
     $('#waLink').href = url; showStep(4); window.open(url, '_blank', 'noopener');
   });
   $('#evalBack').addEventListener('click', () => showStep(Math.max(1, step - 1)));
@@ -177,6 +178,20 @@
   quiz.addEventListener('click', (e) => { const b = e.target.closest('.q-opts button'); if (!b) return; qa[qs] = b.dataset.v; quizGo(qs + 1); });
   $('#quizRestart').addEventListener('click', () => { qa = {}; quizGo(1); });
   $('#qrEval').addEventListener('click', (e) => { e.stopPropagation(); openEval({goal: e.currentTarget.dataset.goal, interest: `Ruta recomendada en el test: ${$('#qrTitle').textContent}`}); });
+
+  /* ───────── envío del lead al CRM ───────── */
+  const LEAD_API = location.hostname === 'makeway4health.vercel.app' ? '/api/lead' : 'https://makeway4health.vercel.app/api/lead';
+  const utm = (() => { try { const q = new URLSearchParams(location.search); const o = {}; ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'].forEach((k) => { if (q.get(k)) o[k] = q.get(k); }); if (Object.keys(o).length) sessionStorage.setItem('mw_utm', JSON.stringify(o)); return JSON.parse(sessionStorage.getItem('mw_utm') || '{}'); } catch { return {}; } })();
+  const ref = document.referrer && !document.referrer.includes(location.hostname) ? document.referrer : '';
+  function sendLead(f, goals) {
+    const data = {
+      nombre: f.get('nombre'), apellido: f.get('apellido'), telefono: f.get('telefono'), email: f.get('email'), nacimiento: f.get('nacimiento'), canal: f.get('canal'),
+      pais: f.get('pais'), region: f.get('estado'), ciudad: f.get('ciudad'), metas: f.get('metas'), altura: f.get('altura'), peso: f.get('peso'), meta: f.get('meta'),
+      objetivos: f.getAll('goal'), interes: interest, ruta_test: $('.q-result.on') ? $('#qrTitle').textContent : '',
+      senales: $$('.signal.on b').map((b) => b.textContent).join(', '), origen: location.href.split('#')[0], referrer: ref, idioma: navigator.language, website: f.get('website') || '', ...utm,
+    };
+    try { fetch(LEAD_API, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data), keepalive: true}).catch(() => {}); } catch (e) {}
+  }
 
   /* ───────── comunidad ───────── */
   const POSTS = [
