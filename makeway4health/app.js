@@ -42,6 +42,11 @@
       </div>
     </article>`).join('');
 
+  /* ───────── frasco con etiqueta real ───────── */
+  const short = (n) => n.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+  const fit = (n) => { const l = n.length; return l <= 11 ? Math.min(8, 70 / l) : Math.min(5.6, 112 / l); };
+  const vial = (p) => { const n = short(p.name); return `<div class="vial-wrap"><img src="assets/img/vial-card.jpg" alt="Frasco ${n}" loading="lazy"><div class="vlabel"><b style="font-size:${fit(n)}cqw">${n}</b><small>${p.dose}</small></div></div>`; };
+
   /* ───────── catálogo ───────── */
   let cat = 'all', q = '';
   const grid = $('#grid');
@@ -53,7 +58,7 @@
     grid.innerHTML = list.map((p) => `
       <button class="pcard" data-id="${p.id}">
         <span class="dose">${p.dose}</span>
-        <div class="pcard-vial"><img src="assets/img/vial.jpg" alt="" loading="lazy"></div>
+        <div class="pcard-vial">${vial(p)}</div>
         <h3>${p.name}</h3>
         <p>${p.summary}</p>
         <div class="cats">${p.categories.map((c) => `<span>${CAT_ES[c] || c}</span>`).join('')}</div>
@@ -73,6 +78,7 @@
   function openProduct(p) {
     if (!p) return; current = p;
     $('#pmName').textContent = p.name; $('#pmDose').textContent = 'MW4H · ' + p.dose;
+    const n = short(p.name); $('#pmVName').textContent = n; $('#pmVName').style.fontSize = fit(n) + 'cqw'; $('#pmVDose').textContent = p.dose;
     $('#pmSummary').textContent = p.description || p.summary;
     $('#pmComp').textContent = p.composition || p.name;
     $('#pmRec').textContent = p.recommended || '—';
@@ -139,6 +145,39 @@
   $('#evalBack').addEventListener('click', () => showStep(Math.max(1, step - 1)));
   $$('[data-whatsapp]').forEach((a) => (a.href = wa('Hola, me gustaría recibir información sobre Make Way 4 Health.')));
 
+  /* ───────── señales (TOFU) ───────── */
+  const sigMsg = ['Marca las que te representan.', 'Una señal ya vale una conversación.', 'Tu cuerpo te está pidiendo otra estrategia.', 'Es momento de evaluarlo con un profesional.'];
+  let sigGoal = '';
+  $('#signalGrid').addEventListener('click', (e) => {
+    const s = e.target.closest('.signal'); if (!s) return;
+    s.classList.toggle('on'); const on = $$('.signal.on'); sigGoal = on.length ? on[on.length - 1].dataset.goal : '';
+    $('#signalCount').textContent = on.length; $('#signalMsg').textContent = sigMsg[Math.min(on.length, 3)];
+  });
+
+  /* ───────── test de ruta (TOFU → MOFU) ───────── */
+  const QR = [
+    {t: 'Peso y metabolismo', img: 'assets/img/metab.jpg', goal: 'Bajar grasa', p: 'Una ruta de 12 semanas que parte de tus medidas y peso meta, con nutrición, fuerza y seguimiento. Si existe indicación, el equipo puede evaluar terapias GLP-1.'},
+    {t: 'Hormonas y vitalidad', img: 'assets/img/horm.jpg', goal: 'Hormonas y vitalidad', p: 'Exploramos energía, sueño, función sexual y contexto hormonal. Cuando corresponde, el médico solicita estudios y diseña una estrategia con controles definidos.'},
+    {t: 'Fuerza y recuperación', img: 'assets/img/recov.jpg', goal: 'Fuerza y recuperación', p: 'Revisamos carga, movilidad, dolor y sueño para que vuelvas a progresar, con entrenamiento, nutrición y herramientas seleccionadas para tu caso.'},
+    {t: 'Longevidad y energía', img: 'assets/img/longev.jpg', goal: 'Longevidad y energía', p: 'Sueño, recuperación, nutrición y biomarcadores organizados en un plan sostenible para sentirte con energía y enfoque a largo plazo.'},
+  ];
+  const quizTail = {a: 'Empezar con dirección clínica te ahorra meses de prueba y error.', b: 'Llevas tiempo intentándolo: un protocolo medido puede destrabar tu progreso.', c: 'Después de un año, lo que falta suele ser estrategia y seguimiento, no esfuerzo.', d: 'Si ya probaste de todo, es momento de que un profesional mire tu caso completo.'};
+  let qs = 1, qa = {};
+  const quiz = $('#quiz');
+  function quizGo(n) {
+    qs = n; $$('.q', quiz).forEach((q) => q.classList.toggle('on', +q.dataset.q === n));
+    $('#quizBar').style.width = `${Math.min(n, 3) / 3 * 100}%`;
+    $('#quizStepLabel').textContent = n < 4 ? `Pregunta ${n} de 3` : 'Resultado listo';
+    if (n === 4) {
+      const r = QR[+qa[1] || 0];
+      $('#qrImg').src = r.img; $('#qrTitle').textContent = r.t; $('#qrText').textContent = `${r.p} ${quizTail[qa[2]] || ''}`;
+      $('#qrEval').dataset.goal = r.goal;
+    }
+  }
+  quiz.addEventListener('click', (e) => { const b = e.target.closest('.q-opts button'); if (!b) return; qa[qs] = b.dataset.v; quizGo(qs + 1); });
+  $('#quizRestart').addEventListener('click', () => { qa = {}; quizGo(1); });
+  $('#qrEval').addEventListener('click', (e) => { e.stopPropagation(); openEval({goal: e.currentTarget.dataset.goal, interest: `Ruta recomendada en el test: ${$('#qrTitle').textContent}`}); });
+
   /* ───────── comunidad ───────── */
   const POSTS = [
     ['@analiareyess', 'https://www.instagram.com/analiareyess/p/DeXvtZ9H4mU/', '248b2bf6e260b630'],
@@ -154,11 +193,11 @@
     <a class="ig" href="${href}" target="_blank" rel="noopener"><img src="assets/community/${img}.jpg" alt="Publicación de ${u}" loading="lazy">
       <span class="ig-play">▶</span><span class="ig-meta">${u}<i>↗</i></span></a>`).join('');
   // arrastrar para desplazar
-  const rail = $('#communityRail'); let down = false, sx = 0, sl = 0, moved = false;
-  rail.addEventListener('pointerdown', (e) => { down = true; moved = false; sx = e.clientX; sl = rail.scrollLeft; });
+  const crail = $('#communityRail'); let down = false, sx = 0, sl = 0, moved = false;
+  crail.addEventListener('pointerdown', (e) => { down = true; moved = false; sx = e.clientX; sl = crail.scrollLeft; });
   window.addEventListener('pointerup', () => (down = false));
-  rail.addEventListener('pointermove', (e) => { if (!down) return; const d = e.clientX - sx; if (Math.abs(d) > 5) moved = true; rail.scrollLeft = sl - d; });
-  rail.addEventListener('click', (e) => { if (moved) e.preventDefault(); }, true);
+  crail.addEventListener('pointermove', (e) => { if (!down) return; const d = e.clientX - sx; if (Math.abs(d) > 5) moved = true; crail.scrollLeft = sl - d; });
+  crail.addEventListener('click', (e) => { if (moved) e.preventDefault(); }, true);
 
   /* ───────── embajadores ───────── */
   const amb = Array.from({length: 23}, (_, i) => String(i + 1).padStart(2, '0'));
@@ -265,7 +304,7 @@
       .from('.hero .split .w>span', {yPercent: 110, rotate: 6, duration: 1.3, stagger: 0.07}, 0.3)
       .from('.hero .reveal-up', {y: 30, opacity: 0, duration: 1, stagger: 0.12}, 0.8)
       .from('.trust-item', {y: 30, opacity: 0, duration: 0.9, stagger: 0.08}, 1.1)
-      .from('.header-in > *', {y: -20, opacity: 0, duration: 0.8, stagger: 0.06}, 0.4);
+      .from('.header-in > *', {y: -20, opacity: 0, duration: 0.8, stagger: 0.06, clearProps: 'transform,opacity'}, 0.4);
     gsap.to('.hero-img', {yPercent: 12, ease: 'none', scrollTrigger: {trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true}});
     gsap.to('.hero-in', {yPercent: -18, opacity: 0.2, ease: 'none', scrollTrigger: {trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true}});
 
@@ -305,6 +344,13 @@
   window.addEventListener('load', () => setTimeout(startMotion, 350));
   setTimeout(() => document.body.classList.contains('ready') || startMotion(), 4000);
 
-  // header al hacer scroll
-  addEventListener('scroll', () => $('#header').classList.toggle('scrolled', scrollY > 30), {passive: true});
+  // header, riel del embudo y barra fija
+  const rail = $$('.funnel-rail a'), stages = $$('[data-stage]:not(a)');
+  addEventListener('scroll', () => {
+    $('#header').classList.toggle('scrolled', scrollY > 30);
+    document.body.classList.toggle('past-hero', scrollY > innerHeight * 0.8);
+    let cur = 1; const mid = innerHeight * 0.45;
+    for (const s of stages) if (s.getBoundingClientRect().top < mid) cur = +s.dataset.stage;
+    rail.forEach((a) => { const n = +a.dataset.stage; a.classList.toggle('on', n === cur); a.classList.toggle('done', n < cur); });
+  }, {passive: true});
 })();
